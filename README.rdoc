@@ -15,15 +15,15 @@ Cabiri is rather straightforward.
     queue = Cabiri::JobQueue.new
 
     queue.add do
-        # define your first job here here
+      # define your first job here here
     end
 
     queue.add do
-        # define your second job here
+      # define your second job here
     end
 
     queue.add do
-        # define your third job here
+      # define your third job here
     end
 
     # start the queue and specify how many processes you want the queue to run in parallel
