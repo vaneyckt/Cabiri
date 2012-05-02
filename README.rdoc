@@ -1,0 +1,34 @@
+== Introduction
+Cabiri is an easy and intuitive Ruby job queue. The code itself has been extensively commented so as to make it easy for others to modify it as desired.
+
+== Getting Started
+Install the gem at the command prompt:
+
+    gem install cabiri
+
+== Examples
+Cabiri is rather straightforward.
+
+    # myapp.rb
+    require 'cabiri'
+
+    queue = Cabiri::JobQueue.new
+
+    queue.add do
+        # define your first job here here
+    end
+
+    queue.add do
+        # define your second job here
+    end
+
+    queue.add do
+        # define your third job here
+    end
+
+    # start the queue and specify how many processes you want the queue to run in parallel
+    queue.start(2)
+
+    # wait for the queue to be finished. This is a blocking call. A non-blocking call is also available.
+    queue.wait_until_finished
+
