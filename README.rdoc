@@ -32,3 +32,7 @@ Cabiri is rather straightforward.
     # wait for all jobs in the queue to be finished. This is a blocking call. A non-blocking call is also available.
     queue.wait_until_finished
 
+    # get results from all three jobs
+    result_1st_job = queue.get_info(0)[:result]
+    result_2nd_job = queue.get_info(1)[:result]
+    result_3rd_job = queue.get_info(2)[:result]
