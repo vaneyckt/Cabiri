@@ -1,5 +1,5 @@
 require 'adeona'
-require '/Users/tomvaneyck/Desktop/Cabiri/lib/cabiri.rb'
+require 'cabiri'
 
 describe "Cabiri" do
   it "should kill the job processes when the main process exits nicely" do
