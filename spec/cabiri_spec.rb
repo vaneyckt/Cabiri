@@ -1,4 +1,3 @@
-require 'adeona'
 require 'cabiri'
 
 describe "Cabiri" do
