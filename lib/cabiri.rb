@@ -11,6 +11,8 @@ module Cabiri
     # - self_pipe:        a pipe that is used by the main process to implement a blocking wait for the
     #                     wait_until_finished method. Both endpoints have sync set to true to prevent the
     #                     kernel from buffering any messages.
+    # - mutex:            a mutex that is used to treat the code that deals with extracting results from
+    #                     finished processes and spawning new processes as a critical section
     # - logger:           a logger to help log errors
     def initialize
       @remaining_jobs = []
@@ -24,6 +26,7 @@ module Cabiri
       @self_pipe[0].sync = true
       @self_pipe[1].sync = true
 
+      @mutex = Mutex.new
       @logger = Logger.new($stdout)
     end
 
@@ -53,22 +56,8 @@ module Cabiri
       end
     end
 
-    # here we start by creating a uid to index mapping. We also add an entry for each
-    # job to the jobs_info array.
-    # Next we define a signal handler that deals with SIGCHLD signals
-    # (a signal that indicates that a child process has terminated). When we receive
-    # such a signal we get the pid and make sure that the child process was one of
-    # the jobs belonging to the job queue.
-    # This needs to be done inside a while loop as two or more child processes exiting
-    # in quick succession might only generate one signal. For example, the first dead
-    # child process will generate a SIGCHLD. However, when a second process dies quickly
-    # afterwards and the previous SIGCHLD signal has not yet been handled, this second
-    # process won't send a second SIGCHLD signal, but will instead assume that the
-    # SIGCHLD handler knows to look for multiple dead processes.
-    # You might also notice that old_handler is being used to redirect this signal to
-    # a possible other previously defined SIGCHLD signal handler.
-    # Also note that we close the write end of the self_pipe when there are no jobs left.
-    # See the comments on the wait_until_finished method for why this is important.
+    # here we start by creating a uid to index mapping and add an entry for each
+    # job to the jobs_info array. We then schedule the first batch of jobs.
     def start(max_active_jobs)
       # create job mappings and initialize job info
       @remaining_jobs.each_with_index do |job, index|
@@ -79,23 +68,8 @@ module Cabiri
         @jobs_info[index][:pid] = nil
         @jobs_info[index][:pipe] = nil
         @jobs_info[index][:error] = nil
-        @jobs_info[index][:state] = :waiting
         @jobs_info[index][:result] = nil
-      end
-
-      # define signal handler
-      old_handler = trap(:CLD) do
-        begin
-          while pid = Process.wait(-1, Process::WNOHANG)
-            if(@active_jobs_pids.include?(pid))
-              handle_finished_job(pid)
-              fill_job_slots(max_active_jobs)
-              @self_pipe[1].close if finished?
-            end
-            old_handler.call if old_handler.respond_to?(:call)
-          end
-        rescue Errno::ECHILD
-        end
+        @jobs_info[index][:state] = :waiting
       end
 
       # start scheduling first batch of jobs
@@ -109,7 +83,7 @@ module Cabiri
     def fill_job_slots(max_active_jobs)
       while(@active_jobs_pids.length < max_active_jobs and !@remaining_jobs.empty?)
         begin
-          start_next_job
+          start_next_job(max_active_jobs)
         rescue => ex
           handle_error(ex)
         ensure
@@ -130,8 +104,18 @@ module Cabiri
     # a hash - we don't know) into a byte stream, put this information inside an array, and then convert this
     # array into a special string designed for transporting binary data as text. This text can now be send
     # through the write endpoint of the pipe. Back outside the job process we close the write endpoint of the
-    # pipe and set sync to true. The rest of the code here should require no comments.
-    def start_next_job
+    # pipe and set sync to true. The next few lines hould require no comment.
+    # We finish by creating a thread that waits for the newly created job to end. This thread is responsible
+    # for extracting information from the finished job and spawning new jobs. Also note that we close the
+    # write end of the self_pipe when there are no jobs left. See the comments on the wait_until_finished
+    # method for why this is important.
+    # Notice how the inside of the thread is wrapped inside a mutex. This is required to prevent a race
+    # condition from occurring when two or more jobs return in quick succession. When the first job
+    # returns, its thread will start scheduling new processes, but this can take some time. If a second
+    # job returns before the thread of the first job is done scheduling, it will start doing scheduling
+    # work as well. So now you have two threads simultaneously doing scheduling work, and the end result
+    # will be unpredictable.
+    def start_next_job(max_active_jobs)
       pipe = IO.pipe()
       job = @remaining_jobs.first
 
@@ -151,6 +135,15 @@ module Cabiri
       @jobs_info[index][:pid] = pid
       @jobs_info[index][:pipe] = pipe
       @jobs_info[index][:state] = :running
+
+      Thread.new(pid) do |my_pid|
+        Process.waitpid(my_pid)
+        @mutex.synchronize do
+          handle_finished_job(my_pid)
+          fill_job_slots(max_active_jobs)
+          @self_pipe[1].close if finished?
+        end
+      end
     end
 
     # when a job finishes, we remove its pid from the array that keeps track of active processes.
