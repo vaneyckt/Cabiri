@@ -1,5 +1,5 @@
 == Introduction
-Cabiri is an easy and intuitive Ruby job queue. The code itself has been extensively commented so as to make it easy for others to modify it as desired.
+Cabiri is an easy and intuitive Ruby job queue for working with parallel processes. The code itself has been extensively commented so as to make it easy for others to modify it as desired.
 
 == Getting Started
 Install the gem at the command prompt:
