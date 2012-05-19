@@ -1,9 +1,9 @@
 Gem::Specification.new do |s|
   s.name        = 'cabiri'
-  s.version     = '0.0.2'
+  s.version     = '0.0.3'
   s.date        = '2012-05-19'
-  s.summary     = "An easy and intuitive Ruby job queue."
-  s.description = "An easy and intuitive Ruby job queue."
+  s.summary     = "An easy and intuitive Ruby job queue for working with parallel processes."
+  s.description = "An easy and intuitive Ruby job queue for working with parallel processes."
   s.authors     = ["Tom Van Eyck"]
   s.email       = 'tomvaneyck@gmail.com'
   s.files       = ["lib/cabiri.rb"]
