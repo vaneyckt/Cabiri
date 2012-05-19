@@ -6,6 +6,12 @@ Install the gem at the command prompt:
 
     gem install cabiri
 
+If it complains about Ruby version 1.9.3 not being installed, you can do the following:
+
+    rvm get head
+    rvm reload
+    rvm install 1.9.3
+
 == Examples
 Cabiri is rather straightforward.
 
