@@ -29,7 +29,8 @@ Cabiri is rather straightforward.
     # start the queue and specify how many processes you want the queue to run in parallel
     queue.start(2)
 
-    # wait for all jobs in the queue to be finished. This is a blocking call. A non-blocking call is also available.
+    # wait for all jobs in the queue to be finished. This is a blocking call. A non-blocking call
+    # is also available.
     queue.wait_until_finished
 
     # get results from all three jobs
