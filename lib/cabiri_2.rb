@@ -4,36 +4,51 @@ module Cabiri
     attr_accessor :block
     attr_accessor :result
     attr_accessor :pipe
+    attr_accessor :lifeline
 
     def initialize(&block)
       @pid = nil
       @block = block
       @result = nil
       @pipe = nil
+      @lifeline = nil
     end
 
     def activate!
       @pipe = IO.pipe
+      @lifeline = IO.pipe
 
       @pid = fork do
         @pipe[0].close
         @pipe[1].sync = true
 
+        @lifeline[1].close
+        @lifeline[0].sync = true
+
         begin
+          lifeline_thread = Thread.new(Thread.current) do |main_thread|
+            result = IO.select([@lifeline[0]], nil, nil, nil)
+            main_thread.raise 'Connection with parent process was lost.'
+          end
           result = @block.call
         rescue => e
-          puts "#{e} in block: #{@block.inspect}"
+          puts "Exception (#{e}) in block: #{@block.inspect}"
         end
 
         @pipe[1].puts [Marshal.dump(result)].pack("m")
       end
+
       @pipe[1].close
       @pipe[0].sync = true
+
+      @lifeline[0].close
+      @lifeline[1].sync = true
     end
 
     def finish!
       @result = Marshal.load(@pipe[0].read.unpack("m")[0])
       @pipe[0].close
+      @lifeline[1].close
       Process.waitpid(@pid)
     end
   end
@@ -126,7 +141,11 @@ end
 #DEBUG
 queue = Cabiri::JobQueue.new
 queue.add do
-  throw 'test'
+  result = 0
+  100000000.times do |t|
+    result += t
+  end
+  result
 end
 
 queue.add do
@@ -137,14 +156,14 @@ queue.add do
   result
 end
 
-Thread.new do
+#Thread.new do
   queue.start(2)
-end
+#end
 
-while !queue.finished?
-  puts 'hello'
-  sleep 1
-end
+#while !queue.finished?
+#  puts 'hello'
+#  sleep 1
+#end
 #puts 'start wait in main process'
 #sleep 30
 #puts 'finishing wait in main process'
