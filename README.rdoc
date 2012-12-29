@@ -1,5 +1,5 @@
 == Introduction
-Cabiri is an easy and intuitive Ruby job queue for working with parallel processes. The code itself has been extensively commented so as to make it easy for others to modify it as desired. This gem requires Ruby 1.9.3 or greater.
+Cabiri is an easy and intuitive Ruby job queue for working with parallel processes. This gem requires Ruby 1.9.3 or greater.
 
 == Getting Started
 Install the gem at the command prompt:
@@ -20,26 +20,89 @@ Cabiri is rather straightforward.
 
     queue = Cabiri::JobQueue.new
 
-    queue.add do
+    queue.add('my first job') do
       # define your first job here
+      result = 0
+        100000000.times do |t|
+        result += t
+      end
+      result
     end
 
-    queue.add do
+    queue.add('my second job') do
       # define your second job here
+      result = 0
+        200000000.times do |t|
+        result += t
+      end
+      result
     end
 
-    queue.add do
+    queue.add('my third job') do
       # define your third job here
+      result = 0
+        300000000.times do |t|
+        result += t
+      end
+      result
     end
 
-    # start the queue and specify how many processes you want the queue to run in parallel
+    # start the queue and specify how many processes you want the queue to run in parallel.
+    # This command blocks until all jobs in the queue have been finished.
     queue.start(2)
 
-    # wait for all jobs in the queue to be finished. This is a blocking call. A non-blocking call
-    # is also available.
-    queue.wait_until_finished
+    # get results from all three jobs
+    result_1st_job = queue.finished_jobs['my first job'].result
+    result_2nd_job = queue.finished_jobs['my second job'].result
+    result_3rd_job = queue.finished_jobs['my third job'].result
+
+Alternatively, if having a blocking call is something you'd like to avoid, you can also do as shown below.
+
+    # myapp.rb
+    require 'cabiri'
+
+    queue = Cabiri::JobQueue.new
+
+    queue.add('my first job') do
+      # define your first job here
+      result = 0
+        100000000.times do |t|
+        result += t
+      end
+      result
+    end
+
+    queue.add('my second job') do
+      # define your second job here
+      result = 0
+        200000000.times do |t|
+        result += t
+      end
+      result
+    end
+
+    queue.add('my third job') do
+      # define your third job here
+      result = 0
+        300000000.times do |t|
+        result += t
+      end
+      result
+    end
+
+    # start the queue and specify how many processes you want the queue to run in parallel.
+    # This command blocks until all jobs in the queue have been finished.
+    # You can start the queue in a different thread to get around this.
+    Thread.new do
+      queue.start(2)
+    end
+
+    while !queue.finished?
+      # do something useful
+      sleep 1
+    end
 
     # get results from all three jobs
-    result_1st_job = queue.get_info(0)[:result]
-    result_2nd_job = queue.get_info(1)[:result]
-    result_3rd_job = queue.get_info(2)[:result]
+    result_1st_job = queue.finished_jobs['my first job'].result
+    result_2nd_job = queue.finished_jobs['my second job'].result
+    result_3rd_job = queue.finished_jobs['my third job'].result

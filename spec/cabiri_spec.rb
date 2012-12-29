@@ -4,22 +4,31 @@ describe "Cabiri" do
   it "should kill the job processes when the main process exits nicely" do
     pipe = IO.pipe
     main_pid = fork do
-      # make a queue and start running two long processes
+      # make a queue and add two long processes
       queue = Cabiri::JobQueue.new
-      queue.add { sleep 1000 }
-      queue.add { sleep 1000 }
-      queue.start(2)
+      queue.add('1st job') { sleep 1000 }
+      queue.add('2nd job') { sleep 1000 }
+
+      # start queue in other thread, as start() is a blocking operation
+      Thread.new do
+        queue.start(2)
+      end
 
       # wait a while and send the pids of both job processes to the spec process
       sleep 5
+      first_job_pid = queue.active_jobs[0].pid
+      second_job_pid = queue.active_jobs[1].pid
+
       pipe[0].close
       pipe[1].sync = true
-      pipe[1].puts queue.get_info(0)[:pid].to_s
-      pipe[1].puts queue.get_info(1)[:pid].to_s
+      pipe[1].puts first_job_pid.to_s
+      pipe[1].puts second_job_pid.to_s
       pipe[1].close
 
       # keep this process active by waiting on the two job processes
-      queue.wait_until_finished
+      while true
+        sleep 1
+      end
     end
 
     # retrieve job pids
@@ -50,22 +59,31 @@ describe "Cabiri" do
   it "should kill the job processes when the main process exits with a SIGKILL" do
     pipe = IO.pipe
     main_pid = fork do
-      # make a queue and start running two long processes
+      # make a queue and add two long processes
       queue = Cabiri::JobQueue.new
-      queue.add { sleep 1000 }
-      queue.add { sleep 1000 }
-      queue.start(2)
+      queue.add('1st job') { sleep 1000 }
+      queue.add('2nd job') { sleep 1000 }
+
+      # start queue in other thread, as start() is a blocking operation
+      Thread.new do
+        queue.start(2)
+      end
 
       # wait a while and send the pids of both job processes to the spec process
       sleep 5
+      first_job_pid = queue.active_jobs[0].pid
+      second_job_pid = queue.active_jobs[1].pid
+
       pipe[0].close
       pipe[1].sync = true
-      pipe[1].puts queue.get_info(0)[:pid].to_s
-      pipe[1].puts queue.get_info(1)[:pid].to_s
+      pipe[1].puts first_job_pid.to_s
+      pipe[1].puts second_job_pid.to_s
       pipe[1].close
 
       # keep this process active by waiting on the two job processes
-      queue.wait_until_finished
+      while true
+        sleep 1
+      end
     end
 
     # retrieve job pids
@@ -82,7 +100,7 @@ describe "Cabiri" do
     process_exists?(job_pids[0]).should be_true
     process_exists?(job_pids[1]).should be_true
 
-    # kill parent process nicely
+    # kill parent process with SIGKILL
     Process.kill("KILL", main_pid)
     Process.waitpid(main_pid)
 
@@ -96,33 +114,36 @@ describe "Cabiri" do
   it "should run jobs in parallel and return the correct results" do
     queue = Cabiri::JobQueue.new
 
-    queue.add do
+    queue.add('1st job') do
       sleep 5
       'process A done'
     end
 
-    queue.add do
+    queue.add('2nd job') do
       sleep 5
       'process B done'
     end
 
-    queue.add do
+    queue.add('3rd job') do
       sleep 10
       'process C done'
     end
 
-    queue.start(2)
+    # start queue in other thread, as start() is a blocking operation
+    Thread.new do
+      queue.start(2)
+    end
 
     sleep 6
-    queue.get_info(0)[:result].should == 'process A done'
-    queue.get_info(1)[:result].should == 'process B done'
-    queue.get_info(2)[:result].should_not == 'process C done'
+    queue.finished_jobs['1st job'].result.should == 'process A done'
+    queue.finished_jobs['2nd job'].result.should == 'process B done'
+    queue.finished_jobs['3rd job'].should == nil
 
     sleep 6
-    queue.get_info(2)[:result].should_not == 'process C done'
+    queue.finished_jobs['3rd job'].should == nil
 
     sleep 6
-    queue.get_info(2)[:result].should == 'process C done'
+    queue.finished_jobs['3rd job'].result.should == 'process C done'
   end
 end
 
